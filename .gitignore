@@ -1,0 +1,21 @@
+# SSH Keys – niemals pushen
+*.pem
+*.key
+id_rsa
+id_ed25519
+id_ed25519.pub
+
+# Umgebungsvariablen
+.env
+
+# Terraform State (enthält IPs und interne Details)
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
