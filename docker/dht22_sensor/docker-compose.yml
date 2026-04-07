@@ -1,0 +1,8 @@
+services:
+  python-app:
+    image: dht22-sensor
+    container_name: dht-python-api
+    privileged: true
+    restart: unless-stopped
+    ports:
+      - "80:5000"
