@@ -1,5 +1,6 @@
 FROM python:3.13-slim
-WORKDIR /home
+WORKDIR /app
+
 
 RUN apt-get update && apt-get install -y \
     python3-dev \
@@ -7,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     swig \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone https://github.com/joan2937/lg.git && \
@@ -22,4 +24,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY humidity.py .
 
-CMD ["python", "./humidity.py"]
+HEALTHCHECK CMD curl -f http://localhost:${PORT}/health || exit 1
+
+CMD ["python3", "./humidity.py"]

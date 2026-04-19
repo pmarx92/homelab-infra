@@ -1,6 +1,9 @@
 from flask import Flask, jsonify
 import adafruit_dht
 import board
+import os
+
+port = int(os.getenv("PORT", 5000))
 
 app = Flask(__name__)
 
@@ -17,8 +20,14 @@ def get_sensor_data():
             "Temperatur": temperature_c,
             "Luftfeuchtigkeit": humidity
         })
-    except RuntimeError as error:
+    except Exception as error:
         return jsonify({"status": "error", "message": str(error)}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=port)
