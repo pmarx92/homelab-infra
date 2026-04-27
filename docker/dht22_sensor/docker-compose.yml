@@ -1,11 +1,16 @@
 services:
   python-app:
     build: .
-    container_name: dht-python-api
+    container_name: dht22-publisher
     privileged: true
     restart: unless-stopped
-    ports:
-      - "80:${PORT}"
     environment:
-      - PORT=${PORT}
+      MQTT_HOST: host.docker.internal
+      MQTT_PORT: 1883
+      MQTT_USER: techpm
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      MQTT_TOPIC: homelab/pi5/dht22/metrics
+      PUBLISH_INTERVAL: 10
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
