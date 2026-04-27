@@ -147,5 +147,5 @@ docker compose up -d --build
 
 ## 📖 Weiterführende Dokumentation
 
-- [Raspberry Pi Edge Node →](raspberry_pi/docs/README.md)
-- [Debian01 Central Node →](debian01/docs/README.md)
+- [Raspberry Pi Edge Node →](raspberry_pi/README.md)
+- [Debian01 Central Node →](debian01/README.md)
