@@ -58,6 +58,9 @@ Beide Dienste sind in einer gemeinsamen `docker-compose.yml` zusammengefasst und
 
 **Grafana** läuft auf Port `3000` und nutzt InfluxDB als Datasource. Die Verbindung wird manuell über die UI oder per provisioning konfiguriert.
 
+<img width="1600" height="493" alt="image" src="https://github.com/user-attachments/assets/d12e2e3a-a3c4-4593-987d-e8a4d19d2020" />
+
+
 ### 2. MQTT-InfluxDB-Subscriber (`docker/mqtt-influx-subscriber/`)
 
 Ein schlanker Python-Service, der:
