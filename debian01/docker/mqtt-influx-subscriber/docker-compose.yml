@@ -1,0 +1,18 @@
+services:
+  mqtt-influx-subscriber:
+    build: .
+    container_name: mqtt-influx-subscriber
+    restart: unless-stopped
+    environment:
+      MQTT_HOST: 192.168.2.148
+      MQTT_PORT: 1883
+      MQTT_USER: techpm
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      MQTT_TOPIC: homelab/pi5/dht22/metrics
+
+      INFLUX_URL: http://host.docker.internal:8086
+      INFLUX_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
+      INFLUX_ORG: homelab
+      INFLUX_BUCKET: sensors
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
