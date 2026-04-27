@@ -21,7 +21,7 @@ Drei containerisierte Dienste arbeiten als Pipeline zusammen:
 │  │   Python · paho-mqtt             │   │
 │  │   Validiert & schreibt Daten     │   │
 │  └──────────────┬───────────────────┘   │
-│                 │ HTTP (host-internal)   │
+│                 │ HTTP (host-internal)  │
 │                 ▼                       │
 │  ┌──────────────────────────────────┐   │
 │  │   InfluxDB 2.x  (Port 8086)      │   │
