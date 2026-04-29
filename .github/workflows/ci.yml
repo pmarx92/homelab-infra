@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Show Docker versions
         run: |
@@ -25,3 +25,12 @@ jobs:
 
       - name: Validate InfluxDB Compose config
         run: docker compose -f debian01/docker/influxdb/docker-compose.yml config
+
+      - name: Validate MQTT Influx Subscriber Compose config
+        run: docker compose -f debian01/docker/mqtt-influx-subscriber config
+
+      - name: Validate DHT22-Sensor Compose config
+        run: docker compose -f raspberry_pi/docker/dht22_sensor config
+
+      - name: Validate Mosquitto Compose config
+        run: docker compose -f raspberry_pi/docker/mosquitto config
