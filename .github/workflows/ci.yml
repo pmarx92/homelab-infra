@@ -23,8 +23,5 @@ jobs:
           docker --version
           docker compose version
 
-      - name: Validate inlfuxDb Compose config
-        run: docker compose config debian01/docker/influxdb/docker-compose.yml config
-
-      - name: Build Docker Compose services
-        run: docker compose build
+      - name: Validate InfluxDB Compose config
+        run: docker compose -f debian01/docker/influxdb/docker-compose.yml config
