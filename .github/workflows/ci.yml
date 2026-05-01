@@ -26,6 +26,12 @@ jobs:
       - name: Validate InfluxDB Compose config
         run: docker compose -f debian01/docker/influxdb/docker-compose.yml config
 
+      - name: Pull InfluxDB image
+      - run: docker compose -f debian01/docker/influxdb/docker-compose.yml pull
+
+      - name: Start InfluxDB
+        run: docker compose -f debian01/docker/influxdb/docker-compose.yml up -d
+
       - name: Validate MQTT Influx Subscriber Compose config
         run: docker compose -f debian01/docker/mqtt-influx-subscriber/docker-compose.yml config
 
