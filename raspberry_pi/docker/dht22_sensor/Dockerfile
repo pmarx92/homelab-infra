@@ -22,7 +22,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python3 -c "import socket, os; host=os.getenv('MQTT_HOST', 'localhost'); port=int(os.getenv('MQTT_PORT', '1883')); socket.create_connection((host, port), timeout=3).close()"
+
 COPY mqtt_publisher.py .
 
 CMD ["python3", "./mqtt_publisher.py"]
-
