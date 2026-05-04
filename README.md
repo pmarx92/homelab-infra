@@ -23,7 +23,7 @@ Dieses Repository dokumentiert den Aufbau und die Automatisierung meiner private
 │                             │          │                  │ HTTP              │
 │  ┌───────────────────────┐  │          │                  ▼                   │
 │  │  Mosquitto Broker     │  │          │  ┌────────────────────────────────┐  │
-│  │  eclipse-mosquitto:2  │  │          │  │  InfluxDB 2.x  · Port 8086     │  │
+│  │  eclipse-mosquitto:2  │  │          │  │  InfluxDB 2.8  · Port 8086     │  │
 │  │  Auth: Password-File  │  │          │  │  Bucket: sensors               │  │
 │  └───────────────────────┘  │          │  └───────────────┬────────────────┘  │
 └─────────────────────────────┘          │                  │ Datasource        │
@@ -52,7 +52,7 @@ Das Setup ist in zwei logische Ebenen unterteilt:
 | **Sprache** | Python 3.13 |
 | **Bibliotheken** | adafruit-circuitpython-dht, Paho-MQTT, InfluxDB-Client |
 | **Messaging** | MQTT · Eclipse Mosquitto 2 |
-| **Storage** | InfluxDB 2.7 |
+| **Storage** | InfluxDB 2.8 |
 | **Visualization** | Grafana |
 
 ---
@@ -64,8 +64,7 @@ homelab-infra/
 ├── README.md                          # Diese Datei
 │
 ├── raspberry_pi/                      # Edge Node
-│   ├── docs/
-│   │   └── README.md                 # Setup-Dokumentation Pi
+│   ├── README.md                      # Setup-Dokumentation Pi
 │   └── docker/
 │       ├── mosquitto/                 # MQTT Broker
 │       │   ├── config/mosquitto.conf
@@ -78,8 +77,7 @@ homelab-infra/
 │           └── requirements.txt
 │
 └── debian01/                          # Central Node
-    ├── docs/
-    │   └── README.md                 # Setup-Dokumentation Debian
+    ├── README.md                      # Setup-Dokumentation Debian
     └── docker/
         ├── influxdb/                  # InfluxDB + Grafana
         │   └── docker-compose.yml

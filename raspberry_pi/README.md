@@ -202,8 +202,7 @@ docker ps
 
 ```
 raspberry_pi/
-├── docs/
-│   └── README.md                  # Diese Datei
+├── README.md                 	   # Diese Datei
 └── docker/
     ├── mosquitto/
     │   ├── config/

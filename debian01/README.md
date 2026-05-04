@@ -24,7 +24,7 @@ Drei containerisierte Dienste arbeiten als Pipeline zusammen:
 │                 │ HTTP (host-internal)  │
 │                 ▼                       │
 │  ┌──────────────────────────────────┐   │
-│  │   InfluxDB 2.x  (Port 8086)      │   │
+│  │   InfluxDB 2.8 (Port 8086)       │   │
 │  │   Zeitreihenspeicher             │   │
 │  │   Bucket: sensors / Org: homelab │   │
 │  └──────────────┬───────────────────┘   │
@@ -43,7 +43,7 @@ Drei containerisierte Dienste arbeiten als Pipeline zusammen:
 | **Runtime** | Docker Engine & Docker Compose |
 | **Basis-Image** | `python:3.13-slim` |
 | **Messaging** | Paho-MQTT (Subscriber-Client) |
-| **Storage** | InfluxDB 2.7 |
+| **Storage** | InfluxDB 2.8 |
 | **Visualization** | Grafana (latest) |
 
 ---
@@ -67,7 +67,7 @@ Ein schlanker Python-Service, der:
 - sich als MQTT-Client mit dem Broker auf dem Pi verbindet
 - eingehende JSON-Payloads (`temperature`, `humidity`, `host`, `sensor`) validiert
 - die Daten als InfluxDB `Point` mit Tags und Fields in den Bucket `sensors` schreibt
-- einen Healthcheck-Timestamp unter `/health/status` aktualisiert – der Container wird neu gestartet, wenn länger als 60 Sekunden keine Daten ankommen
+- Subscriber-Container wird als `unhealthy` markiert, wenn länger als 60 Sekunden keine Daten erfolgreich verarbeitet wurden
 
 ---
 
@@ -186,8 +186,7 @@ Grafana ist unter `http://<debian01-IP>:3000` erreichbar. Beim ersten Login:
 
 ```
 debian01/
-├── docs/
-│   └── README.md          # Diese Datei
+├── README.md         		 # Diese Datei
 └── docker/
     ├── influxdb/
     │   └── docker-compose.yml   # InfluxDB + Grafana
