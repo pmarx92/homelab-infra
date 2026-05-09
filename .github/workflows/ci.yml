@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  docker-compose-check:
+    name: Validate and build Docker Compose stack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Validate InfluxDB Compose config
+        run: docker compose -f debian01/docker/influxdb/docker-compose.yml config
+
+      - name: Pull InfluxDB image
+        run: docker compose -f debian01/docker/influxdb/docker-compose.yml pull
+
+      - name: Start InfluxDB
+        run: docker compose -f debian01/docker/influxdb/docker-compose.yml up -d
+
+      - name: Validate MQTT Influx Subscriber Compose config
+        run: docker compose -f debian01/docker/mqtt-influx-subscriber/docker-compose.yml config
+
+      - name: Build MQTT Influx Subscriber image
+        run: docker compose -f debian01/docker/mqtt-influx-subscriber/docker-compose.yml build
+
+      - name: Validate DHT22-Sensor Compose config
+        run: docker compose -f raspberry_pi/docker/dht22_sensor/docker-compose.yml config
+
+      - name: Validate Mosquitto Compose config
+        run: docker compose -f raspberry_pi/docker/mosquitto/docker-compose.yml config
