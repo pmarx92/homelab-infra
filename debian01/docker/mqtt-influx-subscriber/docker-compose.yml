@@ -4,7 +4,7 @@ services:
     container_name: mqtt-influx-subscriber
     restart: unless-stopped
     environment:
-      MQTT_HOST: 192.168.2.148
+      MQTT_HOST: ${MQTT_HOST}
       MQTT_PORT: 1883
       MQTT_USER: techpm
       MQTT_PASSWORD: ${MQTT_PASSWORD}
