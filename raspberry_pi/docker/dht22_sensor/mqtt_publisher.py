@@ -25,15 +25,12 @@ def int_env(name: str, default: str) -> int:
     except ValueError:
         sys.exit(f"Ungültiger Wert für {name}: {raw!r} (erwartet: Ganzzahl)")
 
-
-# Pflicht: umgebungsabhängig oder geheim
 MQTT_HOST = require_env("MQTT_HOST")
 MQTT_USER = require_env("MQTT_USER")
 MQTT_PASSWORD = require_env("MQTT_PASSWORD")
-
-# Optional: überall gleich, nicht geheim
 MQTT_PORT = int_env("MQTT_PORT", "1883")
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "homelab/pi5/dht22/metrics")
+
 PUBLISH_INTERVAL = int_env("PUBLISH_INTERVAL", "10")
 
 # =========================
@@ -58,7 +55,8 @@ def connect_mqtt():
             print(f"MQTT connection failed: {e}")
             time.sleep(5)
 
-#PUBLISH FUNCTION
+# =========================
+# PUBLISH FUNCTION
 # =========================
 def publish_data(temperature, humidity):
     payload = {
