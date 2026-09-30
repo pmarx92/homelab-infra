@@ -1,12 +1,12 @@
 # 🍓 Raspberry Pi Edge Node: Sensorik & Messaging
 
-Dieser Knoten fungiert als dedizierte Edge-Schnittstelle innerhalb meiner Homelab-Infrastruktur. Seine Hauptaufgabe ist das Erfassen von Umgebungsdaten via GPIO und das Bereitstellen eines lokalen MQTT-Brokers zur Entkoppelung der Datenströme.
+Dieser Knoten fungiert als dedizierte Edge-Schnittstelle innerhalb meiner Homelab-Infrastruktur. Seine Hauptaufgabe ist das Erfassen von Umgebungsdaten via GPIO und das Bereitstellen eines lokalen MQTT-Brokers zur Entkoppelung der Datenströme. Zusätzlich stellt er Host-Metriken über einen node-exporter bereit.
 
 ---
 
 ## 🏗 System-Architektur
 
-Die Software-Infrastruktur ist vollständig dockerisiert. Zwei Container laufen parallel und kommunizieren über das Host-Netzwerk:
+Die Software-Infrastruktur ist vollständig dockerisiert und auf drei Compose-Projekte verteilt. Der Publisher erreicht den Broker über den veröffentlichten Host-Port (`host.docker.internal` → `host-gateway`):
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -15,7 +15,7 @@ Die Software-Infrastruktur ist vollständig dockerisiert. Zwei Container laufen 
 │  ┌─────────────────────┐    JSON via MQTT (QoS 1)   │
 │  │  dht22-publisher    │──────────────────────────┐ │
 │  │  Python 3.13-slim   │  Topic:                  │ │
-│  │  GPIO Pin 12        │  homelab/pi5/dht22/       │ │
+│  │  GPIO Pin 12        │  homelab/pi5/dht22/      │ │
 │  │  Intervall: 10s     │  metrics                 │ │
 │  └─────────────────────┘                          │ │
 │                                                   ▼ │
@@ -25,96 +25,138 @@ Die Software-Infrastruktur ist vollständig dockerisiert. Zwei Container laufen 
 │  │  allow_anonymous false · Password-File Auth  │   │
 │  └──────────────────────────────────────────────┘   │
 │                              │                      │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  node-exporter · Port 9100                   │   │
+│  │  prom/node-exporter:v1.8.1                   │   │
+│  └──────────────────────────────────────────────┘   │
+│                              │                      │
 └──────────────────────────────┼──────────────────────┘
-                               │ MQTT → Debian01
-                               ▼ (mqtt-influx-subscriber)
+                               │ MQTT → Debian01 (mqtt-influx-subscriber)
+                               ▼ Scrape :9100 ← Debian01 (Prometheus)
 ```
 
 | Komponente | Details |
 | :--- | :--- |
-| **Betriebssystem** | Raspberry Pi OS Lite (64-bit) |
-| **Runtime** | Docker Engine & Docker Compose |
-| **Basis-Image** | `python:3.13-slim` |
-| **Broker** | Eclipse Mosquitto 2 |
-| **Sensor** | Adafruit DHT22 · GPIO Pin 12 |
+| **Hardware** | Raspberry Pi 5 |
+| **Runtime** | Docker Engine & Docker Compose Plugin (`docker compose`) |
+| **Basis-Image Publisher** | `python:3.13-slim` (lokal auf dem Pi gebaut) |
+| **Broker** | Eclipse Mosquitto 2 (`eclipse-mosquitto:2`) |
+| **Monitoring** | node-exporter (`prom/node-exporter:v1.8.1`) |
+| **Sensor** | DHT22 · GPIO Pin 12 (`board.D12`) |
 | **Publish-Intervall** | 10 Sekunden |
+
+### Dienste-Übersicht
+
+| Compose-Ordner | Container | Image:Tag | Port (Host:Container) | Zweck |
+| :--- | :--- | :--- | :--- | :--- |
+| `docker/mosquitto/` | `mqtt-broker` | `eclipse-mosquitto:2` | `1883:1883` | MQTT-Broker |
+| `docker/dht22_sensor/` | `dht22-publisher` | lokaler Build (`python:3.13-slim`) | – | DHT22 auslesen & per MQTT publizieren |
+| `docker/node-exporter/` | `node-exporter` | `prom/node-exporter:v1.8.1` | `9100:9100` | Host-Metriken für Prometheus auf debian01 |
+
+Die Ports sind ohne Bind-Adresse veröffentlicht, also auf allen Interfaces (`0.0.0.0`) erreichbar. Alle Container laufen mit `restart: unless-stopped`.
+
+**Build:** Es gibt keine Multi-Arch-/`buildx`-Konfiguration. Das Publisher-Image wird direkt auf dem Pi per `docker compose up -d --build` gebaut. Mosquitto und node-exporter werden als fertige Images gezogen.
 
 ---
 
-## 🛰 DHT22 Publisher
+## 🔌 Hardware
 
-Die Sensor-Logik läuft in einem eigenen Container. Das Python-Skript `mqtt_publisher.py` liest den DHT22-Sensor aus und publiziert die Messwerte als JSON-Payload:
+- Raspberry Pi 5
+- DHT22-Sensor, Signal an **GPIO 12** (im Code `board.D12`), VCC an 3.3V oder 5V, GND an GND
+
+---
+
+## 🛰 DHT22 Publisher (`docker/dht22_sensor/`)
+
+Die Sensor-Logik läuft in einem eigenen Container (`dht22-publisher`). Das Python-Skript `mqtt_publisher.py` liest den DHT22-Sensor aus und publiziert die Messwerte als JSON-Payload auf das Topic `homelab/pi5/dht22/metrics`.
+
+**Technische Besonderheiten:**
+
+- **Hardware-Zugriff:** `privileged: true` im Docker Compose ermöglicht den direkten Zugriff auf GPIO. Es werden keine einzelnen `devices` gemountet.
+- **lg-Bibliothek:** Wird im Dockerfile aus dem Quellcode gebaut (`git clone joan2937/lg`), da sie als C-Extension die GPIO-Kommunikation auf dem Pi 5 ermöglicht. Zusätzlich werden `gpiod` (apt) und die Pakete aus `requirements.txt` (`adafruit-circuitpython-dht`, `rpi-lgpio`, `flask`, `paho-mqtt`) installiert.
+- **Netzwerk:** Der Publisher erreicht den Mosquitto-Broker über `host.docker.internal`, das via `extra_hosts: host-gateway` auf die Host-IP gemappt wird.
+- **Zuverlässigkeit:** Nachrichten werden mit QoS 1 publiziert; der Publisher wartet jeweils auf die Bestätigung (`wait_for_publish`).
+- **Fehlertoleranz:** Kein Container-Absturz bei Lesefehlern – die Schleife läuft nach `PUBLISH_INTERVAL` weiter:
+  - `RuntimeError` (typische Timing-Issues des DHT22) → Log `DHT22 read error: …`
+  - Sensor liefert `None` → Log `Sensor returned None`
+  - Sonstige Exceptions → Log `Unexpected error: …`
+- **Reconnect-Logik:** `connect_mqtt()` wiederholt den Verbindungsversuch mit 5-Sekunden-Pause bis der Broker erreichbar ist.
+- **Healthcheck** (im `Dockerfile`, Intervall 30s, Timeout 5s, Start-Period 20s, 3 Retries): prüft per TCP-Verbindung, ob `MQTT_HOST:MQTT_PORT` erreichbar ist.
+
+`MQTT_HOST` (`host.docker.internal`), `MQTT_TOPIC` und `PUBLISH_INTERVAL` (`10`) sind fest in der `docker-compose.yml` gesetzt.
+
+---
+
+## 📨 MQTT-Nachrichtenformat
+
+**Topic:** `homelab/pi5/dht22/metrics` · **QoS:** 1
 
 ```json
 {
-  "temperature": 22.5,
-  "humidity": 58.3,
+  "temperature": <float>,
+  "humidity": <float>,
   "host": "pi5",
   "sensor": "dht22"
 }
 ```
 
-**Technische Besonderheiten:**
-
-- **Hardware-Zugriff:** `privileged: true` im Docker Compose ermöglicht den direkten Zugriff auf GPIO.
-- **lg-Bibliothek:** Wird im Dockerfile aus dem Quellcode gebaut (`git clone joan2937/lg`), da sie als C-Extension die GPIO-Kommunikation auf dem Pi 5 ermöglicht.
-- **Netzwerk:** Der Publisher erreicht den Mosquitto-Broker über `host.docker.internal`, das via `extra_hosts: host-gateway` auf die Host-IP gemappt wird.
-- **Fehlertoleranz:** `RuntimeError` (typische Timing-Issues des DHT22) werden abgefangen – kein Container-Absturz bei kurzzeitigen Lesefehlern.
-- **Reconnect-Logik:** `connect_mqtt()` wiederholt den Verbindungsversuch mit 5-Sekunden-Pause bis der Broker erreichbar ist.
-
-> **Hinweis:** `humidity.py` ist ein experimenteller Flask-Endpunkt (`/metrics`, `/health`), der die Sensordaten per HTTP statt MQTT bereitstellt. Er ist aktuell **nicht** im Dockerfile eingebunden und wird nicht aktiv genutzt.
+Abnehmer ist der `mqtt-influx-subscriber` auf debian01.
 
 ---
 
-## 🔒 Hardening & OS-Konfiguration
+## 📡 Mosquitto (`docker/mosquitto/`)
 
-Bevor die Dienste ausgerollt wurden, wurde das Basis-System gehärtet:
+Konfiguration aus `config/mosquitto.conf`:
 
-### 1. SSH-Absicherung
+| Einstellung | Wert |
+| :--- | :--- |
+| Listener | `1883` |
+| `allow_anonymous` | `false` |
+| `password_file` | `/etc/mosquitto/credentials` |
+| Persistenz | `persistence true`, `/mosquitto/data/` |
+| Logging | `log_dest stdout` |
 
-Passwortbasierte Logins sind deaktiviert. Der Zugriff erfolgt ausschließlich über Ed25519-Keys.
+Mounts:
 
-```bash
-# Berechtigungen korrekt setzen
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-```
+| Host | Container | Modus |
+| :--- | :--- | :--- |
+| `./config/mosquitto.conf` | `/mosquitto/config/mosquitto.conf` | ro |
+| `/etc/mosquitto/credentials` | `/etc/mosquitto/credentials` | ro |
+| `./data` | `/mosquitto/data` | rw |
+| `./log` | `/mosquitto/log` | rw |
 
-In `/etc/ssh/sshd_config`:
+Da `log_dest stdout` gesetzt ist, landen die Logs in `docker logs mqtt-broker`, nicht in `./log`.
 
-```
-PasswordAuthentication no
-PubkeyAuthentication yes
-```
+---
 
-### 2. MQTT-Authentifizierung
+## 📊 node-exporter (`docker/node-exporter/`)
 
-Der Broker erlaubt keine anonymen Verbindungen. Die Zugangsdaten werden über eine Passwortdatei verwaltet:
+Stellt Host-Metriken des Pi auf Port `9100` bereit. `/proc`, `/sys` und `/` des Hosts werden read-only eingebunden. Abnehmer ist Prometheus auf debian01.
+
+---
+
+## 🔧 Konfiguration & Secrets
+
+Alle sensiblen Werte werden über eine `.env`-Datei gesetzt, die **niemals** ins Repository gepusht wird (`.gitignore` gesichert). Die `.env`-Datei liegt im gleichen Verzeichnis wie die jeweilige `docker-compose.yml`.
+
+**Benötigte `.env`-Variablen pro Compose-Ordner:**
+
+| Compose-Ordner | Variablen |
+| :--- | :--- |
+| `docker/dht22_sensor/` | `MQTT_PORT`, `MQTT_USER`, `MQTT_PASSWORD` |
+| `docker/mosquitto/` | – (keine) |
+| `docker/node-exporter/` | – (keine) |
+
+### MQTT-Passwortdatei
+
+Der Broker erlaubt keine anonymen Verbindungen. Die Zugangsdaten liegen auf dem Pi-Host unter `/etc/mosquitto/credentials` und werden schreibgeschützt in den Container gemountet.
 
 ```bash
 # Passwortdatei anlegen (auf dem Pi-Host, nicht im Container)
 sudo mosquitto_passwd -c /etc/mosquitto/credentials <username>
 ```
 
-Die Datei wird schreibgeschützt in den Container gemountet:
-
-```yaml
-volumes:
-  - /etc/mosquitto/credentials:/etc/mosquitto/credentials:ro
-```
-
-### 3. Netzwerk-Resilienz (Lessons Learned: DNS)
-
-**Problem:** `apt update` schlug beim ersten Setup mit `Temporary failure resolving` fehl.
-
-**Ursache:** Der Standard-Resolver war nicht erreichbar.
-
-**Lösung:** Redundante Upstream-Resolver in `/etc/resolv.conf` eintragen:
-
-```
-nameserver 8.8.8.8
-nameserver 1.1.1.1
-```
+`MQTT_USER` / `MQTT_PASSWORD` in der `.env` des Publishers müssen zu einem Eintrag in dieser Datei passen.
 
 ---
 
@@ -122,20 +164,14 @@ nameserver 1.1.1.1
 
 ### Voraussetzungen
 
-- Docker Engine ≥ 24.x und Docker Compose Plugin installiert
+- Docker Engine und Docker Compose Plugin installiert
 - DHT22-Sensor an GPIO Pin 12 angeschlossen
 - MQTT-Passwortdatei unter `/etc/mosquitto/credentials` angelegt (siehe oben)
-- `.env`-Datei im `dht22_sensor/`-Verzeichnis vorhanden
-
-**Benötigte `.env`-Variablen:**
-
-```env
-MQTT_PASSWORD=<mqtt-passwort>
-```
+- `.env`-Datei im `docker/dht22_sensor/`-Verzeichnis vorhanden
 
 ### Startsequenz
 
-Der DHT22-Publisher benötigt den Broker – daher in dieser Reihenfolge starten:
+Der DHT22-Publisher benötigt den Broker – daher in dieser Reihenfolge starten. Der node-exporter ist unabhängig.
 
 **Schritt 1 – MQTT-Broker starten:**
 
@@ -150,8 +186,6 @@ Status prüfen:
 docker logs mqtt-broker --follow
 ```
 
-Erwartete Ausgabe: `mosquitto version 2.x.x running`
-
 **Schritt 2 – DHT22-Publisher starten:**
 
 ```bash
@@ -165,17 +199,35 @@ Status prüfen:
 docker logs dht22-publisher --follow
 ```
 
-Erwartete Ausgabe (alle 10 Sekunden):
+Erwartete Ausgabe (etwa alle 10 Sekunden):
 
 ```
-Connected to MQTT Broker at host.docker.internal:1883
-Published: {'temperature': 22.5, 'humidity': 58.3, 'host': 'pi5', 'sensor': 'dht22'}
+Connected to MQTT Broker at host.docker.internal:<MQTT_PORT>
+Published: {'temperature': <float>, 'humidity': <float>, 'host': 'pi5', 'sensor': 'dht22'}
+```
+
+**Schritt 3 – node-exporter starten:**
+
+```bash
+cd ../node-exporter
+docker compose up -d
 ```
 
 ### Alle laufenden Container anzeigen
 
 ```bash
 docker ps
+
+# Healthcheck-Status des Publishers prüfen
+docker inspect --format='{{.State.Health.Status}}' dht22-publisher
+```
+
+### Stoppen
+
+```bash
+cd docker/dht22_sensor && docker compose down
+cd ../mosquitto && docker compose down
+cd ../node-exporter && docker compose down
 ```
 
 ---
@@ -184,17 +236,26 @@ docker ps
 
 **Publisher verbindet sich nicht mit dem Broker:**
 - Läuft Mosquitto? → `docker ps` und `docker logs mqtt-broker`
-- Ist `MQTT_PASSWORD` in der `.env` korrekt gesetzt und identisch mit dem Eintrag in der Passwortdatei?
-- Firewall prüfen: `sudo ufw status` – Port 1883 muss offen sein
+- Sind `MQTT_PORT`, `MQTT_USER` und `MQTT_PASSWORD` in der `.env` korrekt gesetzt und passend zur Passwortdatei?
+- Log zeigt `MQTT connection failed: …`? → Der Publisher versucht es alle 5 Sekunden erneut.
 
-**Sensor gibt `None` zurück:**
-- DHT22 benötigt nach dem Einschalten ~2 Sekunden Aufwärmzeit – kurz warten
+**Sensor liefert keine Werte:**
+- Log zeigt `Sensor returned None` oder `DHT22 read error`? → Einzelne Fehler sind typische DHT22-Timing-Issues und nicht kritisch
 - Verkabelung prüfen: Signal an GPIO 12, VCC an 3.3V oder 5V, GND an GND
-- Typische DHT22-Timing-Fehler werden im Log als `DHT22 read error` ausgegeben und sind nicht kritisch
 
 **Container startet nicht (GPIO-Fehler):**
 - Prüfen ob `privileged: true` in der `docker-compose.yml` gesetzt ist
-- Alternativ: Device explizit mounten → `devices: - /dev/gpiomem:/dev/gpiomem`
+
+---
+
+## ✅ CI
+
+Die GitHub-Actions-Pipeline (`.github/workflows/ci.yml`) läuft bei Pushes auf `main` und `feature/**` sowie bei Pull Requests auf `main`. Für den Pi wird geprüft:
+
+- `docker/dht22_sensor/docker-compose.yml`: `config` (Validierung)
+- `docker/mosquitto/docker-compose.yml`: `config` (Validierung)
+
+Es werden keine Pi-Images gebaut; `docker/node-exporter/` wird in der CI nicht geprüft.
 
 ---
 
@@ -202,16 +263,17 @@ docker ps
 
 ```
 raspberry_pi/
-├── README.md                 	   # Diese Datei
+├── README.md                      # Diese Datei
 └── docker/
     ├── mosquitto/
     │   ├── config/
     │   │   └── mosquitto.conf     # Broker-Konfiguration
     │   └── docker-compose.yml
-    └── dht22_sensor/
-        ├── Dockerfile
-        ├── docker-compose.yml
-        ├── mqtt_publisher.py      # Sensor → MQTT (aktiv)
-        ├── humidity.py            # Sensor → HTTP/Flask (experimentell)
-        └── requirements.txt
+    ├── dht22_sensor/
+    │   ├── Dockerfile
+    │   ├── docker-compose.yml
+    │   ├── mqtt_publisher.py      # Sensor → MQTT
+    │   └── requirements.txt
+    └── node-exporter/
+        └── docker-compose.yml
 ```
