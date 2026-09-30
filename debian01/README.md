@@ -86,11 +86,12 @@ INFLUXDB_BUCKET=sensors
 INFLUXDB_ADMIN_TOKEN=<langer-random-token>
 
 # Grafana
-GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=<sicheres-passwort>
+GF_SECURITY_USER=admin
+GF_SECURITY_PASSWORD=<sicheres-passwort>
 
 # MQTT (Subscriber)
 MQTT_HOST=<IP-des-Raspberry-Pi>
+MQTT_PORT=<mqtt-port>
 MQTT_USER=<mqtt-username>
 MQTT_PASSWORD=<mqtt-passwort>
 ```

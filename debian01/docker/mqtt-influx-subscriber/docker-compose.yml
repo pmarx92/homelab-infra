@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     environment:
       MQTT_HOST: ${MQTT_HOST}
-      MQTT_PORT: 1883
-      MQTT_USER: techpm
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USER: ${MQTT_USER}
       MQTT_PASSWORD: ${MQTT_PASSWORD}
       MQTT_TOPIC: homelab/pi5/dht22/metrics
 

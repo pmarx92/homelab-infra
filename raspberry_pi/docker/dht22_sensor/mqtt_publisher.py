@@ -7,15 +7,34 @@ import board
 import paho.mqtt.client as mqtt
 
 # =========================
-# CONFIG
+# Konfiguration
 # =========================
-MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MQTT_USER = os.getenv("MQTT_USER", "techpm")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "homelab/pi5/dht22/metrics")
+def require_env(name: str) -> str:
+    """Variablen lesen, sonst mit Meldung abbrechen."""
+    value = os.getenv(name)
+    if not value:
+        sys.exit(f"Fehlende Umgebungsvariable: {name}")
+    return value
 
-PUBLISH_INTERVAL = int(os.getenv("PUBLISH_INTERVAL", "10"))
+
+def int_env(name: str, default: str) -> int:
+    """Int lesen, bei ungültigem Wert mit Meldung abbrechen."""
+    raw = os.getenv(name, default)
+    try:
+        return int(raw)
+    except ValueError:
+        sys.exit(f"Ungültiger Wert für {name}: {raw!r} (erwartet: Ganzzahl)")
+
+
+# Pflicht: umgebungsabhängig oder geheim
+MQTT_HOST = require_env("MQTT_HOST")
+MQTT_USER = require_env("MQTT_USER")
+MQTT_PASSWORD = require_env("MQTT_PASSWORD")
+
+# Optional: überall gleich, nicht geheim
+MQTT_PORT = int_env("MQTT_PORT", "1883")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "homelab/pi5/dht22/metrics")
+PUBLISH_INTERVAL = int_env("PUBLISH_INTERVAL", "10")
 
 # =========================
 # SENSOR SETUP
